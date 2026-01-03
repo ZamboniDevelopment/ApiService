@@ -52,6 +52,14 @@ public static class NHLSharedApi
         });
 
         // GET | Returns raw games table data
+        app.MapGet($"{prefix}/api/raw/games", async () =>
+        {
+            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
+            await conn.OpenAsync();
+            return Results.Json(await DbUtils.ReadRows(conn, "SELECT * FROM games ORDER BY created_at DESC"));
+        });
+
+        // GET | Returns raw reports table data
         app.MapGet($"{prefix}/api/raw/reports", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -64,25 +72,6 @@ public static class NHLSharedApi
             {
                 VS = vs ?? new(),
                 SO = so ?? new()
-            });
-        });
-
-        // GET | Returns raw reports table data
-        app.MapGet($"{prefix}/api/raw/reports", async () =>
-        {
-            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
-            await conn.OpenAsync();
-
-            var vs = await DbUtils.ReadRows(conn,
-                "SELECT * FROM reports_vs ORDER BY created_at DESC");
-
-            var so = await DbUtils.ReadRows(conn,
-                "SELECT * FROM reports_so ORDER BY created_at DESC");
-
-            return Results.Json(new
-            {
-                VS = vs,
-                SO = so
             });
         });
 
