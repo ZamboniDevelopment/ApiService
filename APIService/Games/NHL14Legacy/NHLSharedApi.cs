@@ -16,7 +16,6 @@ public static class NHLSharedApi
          * TODO: MISSING:
          * nhllegacy/status, nhl14/status
          */
-
         // GET | List of players (REDIS ROUTE)
         app.MapGet($"{prefix}/api/players", async (HttpContext ctx) =>
         {
@@ -61,6 +60,7 @@ public static class NHLSharedApi
         });
 
         // GET | Returns raw reports table data
+        // BUG: UNION ALL MISMATCH TABLE (UNMATCHED DATA)
         app.MapGet($"{prefix}/api/raw/reports", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -75,6 +75,7 @@ public static class NHLSharedApi
         });
 
         // GET | Returns a better list of games combined from reports
+        // BUG: UNION ALL MISMATCH TABLE (UNMATCHED DATA)
         app.MapGet($"{prefix}/api/games", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -130,6 +131,7 @@ public static class NHLSharedApi
         });
 
         // GET | Returns summary from summary of game via id
+        // BUG: UNION ALL MISMATCH TABLE (UNMATCHED DATA)
         app.MapGet($"{prefix}/api/games/{{id:int}}/summary", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);

@@ -13,11 +13,10 @@ public static class Nhl10Api
         
         /*
          * TODO: MISSING:
-         * nhl10/api/stats/active
          * nhl10/status
          */
         
-        // PLAYERS
+        // GET | Returns list of players (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/players", async (HttpContext ctx) =>
         {
             var redis = RedisUtils.GetDatabase(ctx);
@@ -45,7 +44,7 @@ public static class Nhl10Api
             return Results.Text(json, "application/json");
         });
 
-        // PLAYER PROFILE
+        // GET | Returns player info from gamertag (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/player/{{gamertag}}", async (HttpContext ctx, string gamertag) =>
         {
             var redis = RedisUtils.GetDatabase(ctx);
@@ -86,7 +85,7 @@ public static class Nhl10Api
             return Results.Text(json, "application/json");
         });
 
-        // RAW
+        // GET | Raw db rows from games table
         app.MapGet($"{prefix}/api/raw/games", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -95,6 +94,7 @@ public static class Nhl10Api
             return Results.Json(await DbUtils.ReadRows(conn, "SELECT * FROM games"));
         });
 
+        // GET | Raw db rows from reports table
         app.MapGet($"{prefix}/api/raw/reports", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -103,7 +103,7 @@ public static class Nhl10Api
             return Results.Json(await DbUtils.ReadRows(conn, "SELECT * FROM reports"));
         });
 
-       // GAMES LIST
+       // GET | Lists games aggregated from reports (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/games", async (HttpContext ctx) =>
         {
             var redis = RedisUtils.GetDatabase(ctx);
@@ -171,7 +171,7 @@ public static class Nhl10Api
             return Results.Text(json, "application/json");
         });
 
-        // GAME REPORTS
+        // GET | Returns reports via id
         app.MapGet($"{prefix}/api/game/{{id:int}}/reports", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -190,9 +190,7 @@ public static class Nhl10Api
             });
         });
 
-        // LEADERBOARD (cached)
-
-        // LEADERBOARD
+        // GET | Returns leaderboard by range (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/leaderboard/{{range}}", async (HttpContext ctx, string range) =>
         {
             var redis = RedisUtils.GetDatabase(ctx);
@@ -246,7 +244,7 @@ public static class Nhl10Api
             return Results.Text(json, "application/json");
         });
 
-        // GLOBAL STATS
+        // GET | returns global stats (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/stats/global", async (HttpContext ctx) =>
         {
             var redis = RedisUtils.GetDatabase(ctx);
@@ -284,7 +282,7 @@ public static class Nhl10Api
             return Results.Text(json, "application/json");
         });
 
-        // LATEST REPORTS
+        // GET | Returns latests reports from range 1-500
         app.MapGet($"{prefix}/api/reports/latest", async (int? limit) =>
         {
             int max = Math.Clamp(limit ?? 50, 1, 500);
@@ -300,7 +298,7 @@ public static class Nhl10Api
             """));
         });
 
-        // USER HISTORY
+        // GET | Returns users played matches history
         app.MapGet($"{prefix}/api/user/{{id:int}}/history", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -340,7 +338,7 @@ public static class Nhl10Api
             return Results.Json(userRows);
         });
 
-        // GAME SUMMARY
+        // GET | Returns summary of game via id
         app.MapGet($"{prefix}/api/games/{{id:int}}/summary", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
