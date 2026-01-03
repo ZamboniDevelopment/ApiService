@@ -52,44 +52,55 @@ public static class NHLSharedApi
         });
 
         // GET | Returns raw games table data
-        app.MapGet($"{prefix}/api/raw/games", async () =>
-        {
-            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
-            await conn.OpenAsync();
-            return Results.Json(await DbUtils.ReadRows(conn, "SELECT * FROM games ORDER BY created_at DESC"));
-        });
-
-        // GET | Returns raw reports table data
-        // BUG: UNION ALL MISMATCH TABLE (UNMATCHED DATA)
         app.MapGet($"{prefix}/api/raw/reports", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            return Results.Json(await DbUtils.ReadRows(conn, """
-                SELECT * FROM reports_vs
-                UNION ALL
-                SELECT * FROM reports_so
-                ORDER BY created_at DESC
-            """));
+            var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports_vs ORDER BY created_at DESC");
+            var so = await DbUtils.ReadRows(conn, "SELECT * FROM reports_so ORDER BY created_at DESC");
+
+            return Results.Json(new
+            {
+                VS = vs ?? new(),
+                SO = so ?? new()
+            });
+        });
+
+        // GET | Returns raw reports table data
+        app.MapGet($"{prefix}/api/raw/reports", async () =>
+        {
+            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
+            await conn.OpenAsync();
+
+            var vs = await DbUtils.ReadRows(conn,
+                "SELECT * FROM reports_vs ORDER BY created_at DESC");
+
+            var so = await DbUtils.ReadRows(conn,
+                "SELECT * FROM reports_so ORDER BY created_at DESC");
+
+            return Results.Json(new
+            {
+                VS = vs,
+                SO = so
+            });
         });
 
         // GET | Returns a better list of games combined from reports
-        // BUG: UNION ALL MISMATCH TABLE (UNMATCHED DATA)
         app.MapGet($"{prefix}/api/games", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            var games = await DbUtils.ReadRows(conn, "SELECT * FROM games ORDER BY created_at DESC");
+            var games = await DbUtils.ReadRows(conn,
+                "SELECT * FROM games ORDER BY created_at DESC");
 
-            var reports = await DbUtils.ReadRows(conn, """
-                SELECT * FROM reports_vs
-                UNION ALL
-                SELECT * FROM reports_so
-            """);
+            var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports_vs");
+            var so = await DbUtils.ReadRows(conn, "SELECT * FROM reports_so");
 
-            var grouped = reports
+            var allReports = vs.Concat(so).ToList();
+
+            var grouped = allReports
                 .GroupBy(r => Convert.ToInt64(r["game_id"]))
                 .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -105,7 +116,6 @@ public static class NHLSharedApi
                 {
                     game_id = id,
                     created_at = g["created_at"],
-                    teams = reps.Select(r => r["team_name"]).Distinct(),
                     players = reps.Count,
                     totalGoals = reps.Sum(r => Convert.ToInt32(r["scor"] ?? 0)),
                     avgFps = reps.Any() ? reps.Average(r => Convert.ToInt32(r["fpsavg"] ?? 0)) : 0,
@@ -123,49 +133,61 @@ public static class NHLSharedApi
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            return Results.Json(await DbUtils.ReadRows(conn, """
-                SELECT * FROM reports_vs WHERE game_id=@id
-                UNION ALL
-                SELECT * FROM reports_so WHERE game_id=@id
-            """, new NpgsqlParameter("id", id)));
+            var vs = await DbUtils.ReadRows(
+                conn,
+                "SELECT * FROM reports_vs WHERE game_id=@id",
+                new NpgsqlParameter("id", id)
+            );
+
+            var so = await DbUtils.ReadRows(
+                conn,
+                "SELECT * FROM reports_so WHERE game_id=@id",
+                new NpgsqlParameter("id", id)
+            );
+
+            return Results.Json(new
+            {
+                VS = vs ?? new List<Dictionary<string, object?>>(),
+                SO = so ?? new List<Dictionary<string, object?>>()
+            });
         });
 
         // GET | Returns summary from summary of game via id
-        // BUG: UNION ALL MISMATCH TABLE (UNMATCHED DATA)
         app.MapGet($"{prefix}/api/games/{{id:int}}/summary", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            var reports = await DbUtils.ReadRows(conn, """
-                SELECT * FROM reports_vs WHERE game_id=@id
-                UNION ALL
-                SELECT * FROM reports_so WHERE game_id=@id
-            """, new NpgsqlParameter("id", id));
+            var vs = await DbUtils.ReadRows(
+                conn,
+                "SELECT * FROM reports_vs WHERE game_id=@id",
+                new NpgsqlParameter("id", id)
+            );
 
-            if (reports.Count == 0)
-                return Results.NotFound();
+            var so = await DbUtils.ReadRows(
+                conn,
+                "SELECT * FROM reports_so WHERE game_id=@id",
+                new NpgsqlParameter("id", id)
+            );
 
-            var home = reports.Where(r => Convert.ToBoolean(r["home"])).ToList();
-            var away = reports.Where(r => !Convert.ToBoolean(r["home"])).ToList();
+            var all = vs.Concat(so).ToList();
+
+            if (!all.Any())
+                return Results.NotFound(); // no reports at all
+
+            var home = all.Where(r => Convert.ToBoolean(r["home"])).ToList();
+            var away = all.Where(r => !Convert.ToBoolean(r["home"])).ToList();
 
             int homeScore = home.Sum(r => Convert.ToInt32(r["scor"] ?? 0));
             int awayScore = away.Sum(r => Convert.ToInt32(r["scor"] ?? 0));
 
-            string? winner =
-                homeScore > awayScore ? home.FirstOrDefault()?["team_name"]?.ToString() :
-                awayScore > homeScore ? away.FirstOrDefault()?["team_name"]?.ToString() :
-                null;
-
             return Results.Json(new
             {
                 gameId = id,
-                homeTeam = home.FirstOrDefault()?["team_name"],
-                awayTeam = away.FirstOrDefault()?["team_name"],
                 homeScore,
                 awayScore,
-                winnerTeam = winner,
-                reports
+                VS = vs,
+                SO = so 
             });
         });
         
