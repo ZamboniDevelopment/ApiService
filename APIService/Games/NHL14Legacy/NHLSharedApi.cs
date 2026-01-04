@@ -168,9 +168,9 @@ public static class NHLSharedApi
                     game_id = id,
                     created_at = g["created_at"],
                     players = reps.Count,
-                    totalGoals = reps.Sum(r => Convert.ToInt32(r["scor"] ?? 0)),
-                    avgFps = reps.Any() ? reps.Average(r => Convert.ToInt32(r["fpsavg"] ?? 0)) : 0,
-                    avgLatency = reps.Any() ? reps.Average(r => Convert.ToInt32(r["lateavgnet"] ?? 0)) : 0,
+                    totalGoals = reps.Sum(r => Convert.ToInt64(r["scor"] ?? 0)),
+                    avgFps = reps.Any() ? reps.Average(r => Convert.ToInt64(r["fpsavg"] ?? 0)) : 0,
+                    avgLatency = reps.Any() ? reps.Average(r => Convert.ToInt64(r["lateavgnet"] ?? 0)) : 0,
                     status = reps.Count > 0 ? "Finished" : "Unknown"
                 });
             }
