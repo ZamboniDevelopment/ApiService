@@ -138,73 +138,104 @@ public static class NHLSharedApi
         });
 
         // GET | Returns a better list of games combined from reports
-        app.MapGet($"{prefix}/api/games", async () =>
+app.MapGet($"{prefix}/api/games", async () =>
+{
+    await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
+    await conn.OpenAsync();
+
+    var games = await DbUtils.ReadRows(
+        conn,
+        "SELECT * FROM games ORDER BY created_at DESC"
+    );
+
+    var vsReports = await DbUtils.ReadRows(conn, "SELECT * FROM reports_vs");
+    var soReports = await DbUtils.ReadRows(conn, "SELECT * FROM reports_so");
+
+    static long L(object? v)
+        => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
+
+    var vsByGame = vsReports
+        .GroupBy(r => Convert.ToInt64(r["game_id"]))
+        .ToDictionary(g => g.Key, g => g.ToList());
+
+    var soByGame = soReports
+        .GroupBy(r => Convert.ToInt64(r["game_id"]))
+        .ToDictionary(g => g.Key, g => g.ToList());
+
+    var vsGames = new List<object>();
+    var soGames = new List<object>();
+
+    foreach (var g in games)
+    {
+        var id = Convert.ToInt64(g["game_id"]);
+
+        if (vsByGame.TryGetValue(id, out var reps))
         {
-            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
-            await conn.OpenAsync();
-
-            var games = await DbUtils.ReadRows(
-                conn,
-                "SELECT * FROM games ORDER BY created_at DESC"
-            );
-
-            var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports_vs");
-            var so = await DbUtils.ReadRows(conn, "SELECT * FROM reports_so");
-
-            var vsByGame = vs
-                .GroupBy(r => Convert.ToInt64(r["game_id"]))
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            var soByGame = so
-                .GroupBy(r => Convert.ToInt64(r["game_id"]))
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            static long L(object? v)
-                => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
-
-            var vsGames = new List<object>();
-            var soGames = new List<object>();
-
-            foreach (var g in games)
+            vsGames.Add(new
             {
-                var id = Convert.ToInt64(g["game_id"]);
+                game_id = id,
+                created_at = g["created_at"],
+                fnsh = g.GetValueOrDefault("fnsh"),
+                gtyp = g.GetValueOrDefault("gtyp"),
+                venue = g.GetValueOrDefault("venue"),
 
-                if (vsByGame.TryGetValue(id, out var vsReps))
+                players = reps.Count,
+                totalGoals = reps.Sum(r => L(r["scor"])),
+                avgFps = reps.Any() ? reps.Average(r => L(r["fpsavg"])) : 0,
+                avgLatency = reps.Any() ? reps.Average(r => L(r["lateavgnet"])) : 0,
+
+                teams = reps.Select(r => new
                 {
-                    vsGames.Add(new
-                    {
-                        game_id = id,
-                        created_at = g["created_at"],
-                        players = vsReps.Count,
-                        totalGoals = vsReps.Sum(r => L(r["scor"])),
-                        avgFps = vsReps.Any() ? vsReps.Average(r => L(r["fpsavg"])) : 0,
-                        avgLatency = vsReps.Any() ? vsReps.Average(r => L(r["lateavgnet"])) : 0,
-                        status = "Finished"
-                    });
-                }
+                    team_name = r.GetValueOrDefault("tnam"),
+                    score = r.GetValueOrDefault("scor"),
+                    shots = r.GetValueOrDefault("shts"),
+                    hits = r.GetValueOrDefault("hits"),
+                    gamertag = r.GetValueOrDefault("gtag")
+                }),
 
-                if (soByGame.TryGetValue(id, out var soReps))
-                {
-                    soGames.Add(new
-                    {
-                        game_id = id,
-                        created_at = g["created_at"],
-                        players = soReps.Count,
-                        totalGoals = soReps.Sum(r => L(r["scor"])),
-                        avgFps = soReps.Any() ? soReps.Average(r => L(r["fpsavg"])) : 0,
-                        avgLatency = soReps.Any() ? soReps.Average(r => L(r["lateavgnet"])) : 0,
-                        status = "Finished"
-                    });
-                }
-            }
-
-            return Results.Json(new
-            {
-                VS = vsGames,
-                SO = soGames
+                status = Convert.ToBoolean(g.GetValueOrDefault("fnsh") ?? false)
+                    ? "Finished"
+                    : "In Progress"
             });
-        });
+        }
 
+        if (soByGame.TryGetValue(id, out reps))
+        {
+            soGames.Add(new
+            {
+                game_id = id,
+                created_at = g["created_at"],
+                fnsh = g.GetValueOrDefault("fnsh"),
+                gtyp = g.GetValueOrDefault("gtyp"),
+                venue = g.GetValueOrDefault("venue"),
+
+                players = reps.Count,
+                totalGoals = reps.Sum(r => L(r["scor"])),
+                avgFps = reps.Any() ? reps.Average(r => L(r["fpsavg"])) : 0,
+                avgLatency = reps.Any() ? reps.Average(r => L(r["lateavgnet"])) : 0,
+
+                teams = reps.Select(r => new
+                {
+                    team_name = r.GetValueOrDefault("tnam"),
+                    score = r.GetValueOrDefault("scor"),
+                    shots = r.GetValueOrDefault("shts"),
+                    hits = r.GetValueOrDefault("hits"),
+                    gamertag = r.GetValueOrDefault("gtag")
+                }),
+
+                status = Convert.ToBoolean(g.GetValueOrDefault("fnsh") ?? false)
+                    ? "Finished"
+                    : "In Progress"
+            });
+        }
+    }
+
+    return Results.Json(new
+    {
+        VS = vsGames,
+        SO = soGames
+    });
+});
         // GET | Returns VS or SO reports via game id
         app.MapGet($"{prefix}/api/game/{{id:int}}/reports", async (int id) =>
         {
