@@ -50,6 +50,68 @@ public static class NHLSharedApi
 
             return Results.Text(json, "application/json");
         });
+        
+        // GET | Returns info about player via gamertag (REDIS SUPPORT)
+        app.MapGet($"{prefix}/api/player/{{gamertag}}", async (HttpContext ctx, string gamertag) =>
+        {
+            var redis = RedisUtils.GetDatabase(ctx);
+            string key = $"nhl:{game.RoutePrefix}:player:{gamertag.ToLowerInvariant()}";
+
+            if (redis != null)
+            {
+                var cached = await redis.StringGetAsync(key);
+                if (cached.HasValue)
+                    return Results.Text(cached!, "application/json");
+            }
+
+            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
+            await conn.OpenAsync();
+
+            var vs = await DbUtils.ReadRows(conn, """
+                                                      SELECT user_id, scor
+                                                      FROM reports_vs
+                                                      WHERE gtag = @gt
+                                                  """, new NpgsqlParameter("gt", gamertag));
+            var so = await DbUtils.ReadRows(conn, """
+                                                      SELECT user_id, scor
+                                                      FROM reports_so
+                                                      WHERE gtag = @gt
+                                                  """, new NpgsqlParameter("gt", gamertag));
+            if (!vs.Any() && !so.Any())
+                return Results.NotFound();
+            
+            var userId =
+                vs.FirstOrDefault()?["user_id"]
+                ?? so.FirstOrDefault()?["user_id"];
+
+            int vsGames = vs.Count;
+            int soGames = so.Count;
+            int vsGoals = vs.Sum(r => Convert.ToInt32(r["scor"] ?? 0));
+            int soGoals = so.Sum(r => Convert.ToInt32(r["scor"] ?? 0));
+
+            var result = new
+            {
+                userId = Convert.ToInt64(userId!),
+                playerName = gamertag,
+                VS = new
+                {
+                    games = vsGames,
+                    goals = vsGoals
+                },
+                SO = new
+                {
+                    games = soGames,
+                    goals = soGoals
+                },
+                totalGames = vsGames + soGames,
+                totalGoals = vsGoals + soGoals
+            };
+
+            var json = JsonSerializer.Serialize(result);
+            if (redis != null)
+                await redis.StringSetAsync(key, json, TimeSpan.FromSeconds(30));
+            return Results.Text(json, "application/json");
+        });
 
         // GET | Returns raw games table data
         app.MapGet($"{prefix}/api/raw/games", async () =>
@@ -288,26 +350,33 @@ public static class NHLSharedApi
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            var userRows = await DbUtils.ReadRows(conn, """
-                SELECT * FROM reports_vs WHERE user_id=@id
-                UNION ALL
-                SELECT * FROM reports_so WHERE user_id=@id
-            """, new NpgsqlParameter("id", id));
+            var vs = await DbUtils.ReadRows(conn,
+                "SELECT * FROM reports_vs WHERE user_id=@id",
+                new NpgsqlParameter("id", id));
 
-            if (userRows.Count == 0)
+            var so = await DbUtils.ReadRows(conn,
+                "SELECT * FROM reports_so WHERE user_id=@id",
+                new NpgsqlParameter("id", id));
+
+            if (!vs.Any() && !so.Any())
                 return Results.Json(Array.Empty<object>());
 
-            var gameIds = userRows.Select(r => Convert.ToInt64(r["game_id"])).Distinct().ToArray();
+            var userReports = vs.Concat(so).ToList();
+            var gameIds = userReports.Select(r => Convert.ToInt64(r["game_id"])).Distinct().ToArray();
 
-            var oppRows = await DbUtils.ReadRows(conn, """
-                SELECT * FROM reports_vs WHERE game_id = ANY(@ids)
-                UNION ALL
-                SELECT * FROM reports_so WHERE game_id = ANY(@ids)
-            """, new NpgsqlParameter("ids", gameIds));
+            var oppVs = await DbUtils.ReadRows(conn,
+                "SELECT * FROM reports_vs WHERE game_id = ANY(@ids)",
+                new NpgsqlParameter("ids", gameIds));
 
-            foreach (var r in userRows)
+            var oppSo = await DbUtils.ReadRows(conn,
+                "SELECT * FROM reports_so WHERE game_id = ANY(@ids)",
+                new NpgsqlParameter("ids", gameIds));
+
+            var oppAll = oppVs.Concat(oppSo).ToList();
+
+            foreach (var r in userReports)
             {
-                var opp = oppRows.FirstOrDefault(o =>
+                var opp = oppAll.FirstOrDefault(o =>
                     Convert.ToInt64(o["game_id"]) == Convert.ToInt64(r["game_id"]) &&
                     Convert.ToInt64(o["user_id"]) != Convert.ToInt64(r["user_id"])
                 );
@@ -315,12 +384,16 @@ public static class NHLSharedApi
                 if (opp != null)
                 {
                     r["opponent"] = opp["gtag"];
-                    r["opponent_team"] = opp["team_name"];
+                    r["opponent_team"] = opp["tnam"];
                     r["opponent_score"] = opp["scor"];
                 }
             }
 
-            return Results.Json(userRows);
+            return Results.Json(new
+            {
+                VS = vs,
+                SO = so
+            });
         });
     }
 }
