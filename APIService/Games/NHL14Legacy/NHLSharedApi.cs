@@ -11,7 +11,7 @@ public static class NHLSharedApi
     public static void Map(WebApplication app, GameConfig game)
     {
         string prefix = "/" + game.RoutePrefix.Trim('/');
-        
+
         /*
          * TODO: MISSING:
          * nhllegacy/status, nhl14/status
@@ -50,7 +50,7 @@ public static class NHLSharedApi
 
             return Results.Text(json, "application/json");
         });
-        
+
         // GET | Returns info about player via gamertag (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/player/{{gamertag}}", async (HttpContext ctx, string gamertag) =>
         {
@@ -79,7 +79,7 @@ public static class NHLSharedApi
                                                   """, new NpgsqlParameter("gt", gamertag));
             if (!vs.Any() && !so.Any())
                 return Results.NotFound();
-            
+
             var userId =
                 vs.FirstOrDefault()?["user_id"]
                 ?? so.FirstOrDefault()?["user_id"];
@@ -143,39 +143,66 @@ public static class NHLSharedApi
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            var games = await DbUtils.ReadRows(conn,
-                "SELECT * FROM games ORDER BY created_at DESC");
+            var games = await DbUtils.ReadRows(
+                conn,
+                "SELECT * FROM games ORDER BY created_at DESC"
+            );
 
             var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports_vs");
             var so = await DbUtils.ReadRows(conn, "SELECT * FROM reports_so");
 
-            var allReports = vs.Concat(so).ToList();
-
-            var grouped = allReports
+            var vsByGame = vs
                 .GroupBy(r => Convert.ToInt64(r["game_id"]))
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            var result = new List<object>();
+            var soByGame = so
+                .GroupBy(r => Convert.ToInt64(r["game_id"]))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            static long L(object? v)
+                => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
+
+            var vsGames = new List<object>();
+            var soGames = new List<object>();
 
             foreach (var g in games)
             {
                 var id = Convert.ToInt64(g["game_id"]);
-                grouped.TryGetValue(id, out var reps);
-                reps ??= new();
 
-                result.Add(new
+                if (vsByGame.TryGetValue(id, out var vsReps))
                 {
-                    game_id = id,
-                    created_at = g["created_at"],
-                    players = reps.Count,
-                    totalGoals = reps.Sum(r => Convert.ToInt64(r["scor"] ?? 0)),
-                    avgFps = reps.Any() ? reps.Average(r => Convert.ToInt64(r["fpsavg"] ?? 0)) : 0,
-                    avgLatency = reps.Any() ? reps.Average(r => Convert.ToInt64(r["lateavgnet"] ?? 0)) : 0,
-                    status = reps.Count > 0 ? "Finished" : "Unknown"
-                });
+                    vsGames.Add(new
+                    {
+                        game_id = id,
+                        created_at = g["created_at"],
+                        players = vsReps.Count,
+                        totalGoals = vsReps.Sum(r => L(r["scor"])),
+                        avgFps = vsReps.Any() ? vsReps.Average(r => L(r["fpsavg"])) : 0,
+                        avgLatency = vsReps.Any() ? vsReps.Average(r => L(r["lateavgnet"])) : 0,
+                        status = "Finished"
+                    });
+                }
+
+                if (soByGame.TryGetValue(id, out var soReps))
+                {
+                    soGames.Add(new
+                    {
+                        game_id = id,
+                        created_at = g["created_at"],
+                        players = soReps.Count,
+                        totalGoals = soReps.Sum(r => L(r["scor"])),
+                        avgFps = soReps.Any() ? soReps.Average(r => L(r["fpsavg"])) : 0,
+                        avgLatency = soReps.Any() ? soReps.Average(r => L(r["lateavgnet"])) : 0,
+                        status = "Finished"
+                    });
+                }
             }
 
-            return Results.Json(result);
+            return Results.Json(new
+            {
+                VS = vsGames,
+                SO = soGames
+            });
         });
 
         // GET | Returns VS or SO reports via game id
@@ -238,10 +265,10 @@ public static class NHLSharedApi
                 homeScore,
                 awayScore,
                 VS = vs,
-                SO = so 
+                SO = so
             });
         });
-        
+
         // GET | Returns leaderboards by spesified range (REDIS SUPPORT)
         app.MapGet($"{prefix}/api/leaderboard/{{range}}", async (HttpContext ctx, string range) =>
         {
@@ -297,25 +324,28 @@ public static class NHLSharedApi
 
             return Results.Text(json, "application/json");
         });
-        
+
         // GET | Returns global stats
         app.MapGet($"{prefix}/api/stats/global", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
-            var games = Convert.ToInt32((await new NpgsqlCommand("SELECT COUNT(*) FROM games", conn).ExecuteScalarAsync())!);
+            var games = Convert.ToInt32(
+                (await new NpgsqlCommand("SELECT COUNT(*) FROM games", conn).ExecuteScalarAsync())!);
             var reports =
-                Convert.ToInt32((await new NpgsqlCommand("SELECT COUNT(*) FROM reports_vs", conn).ExecuteScalarAsync())!) +
-                Convert.ToInt32((await new NpgsqlCommand("SELECT COUNT(*) FROM reports_so", conn).ExecuteScalarAsync())!);
+                Convert.ToInt32(
+                    (await new NpgsqlCommand("SELECT COUNT(*) FROM reports_vs", conn).ExecuteScalarAsync())!) +
+                Convert.ToInt32(
+                    (await new NpgsqlCommand("SELECT COUNT(*) FROM reports_so", conn).ExecuteScalarAsync())!);
 
             var players = Convert.ToInt32((await new NpgsqlCommand("""
-                SELECT COUNT(DISTINCT gtag) FROM (
-                    SELECT gtag FROM reports_vs
-                    UNION
-                    SELECT gtag FROM reports_so
-                ) x
-            """, conn).ExecuteScalarAsync())!);
+                                                                       SELECT COUNT(DISTINCT gtag) FROM (
+                                                                           SELECT gtag FROM reports_vs
+                                                                           UNION
+                                                                           SELECT gtag FROM reports_so
+                                                                       ) x
+                                                                   """, conn).ExecuteScalarAsync())!);
 
             return Results.Json(new
             {
@@ -334,14 +364,14 @@ public static class NHLSharedApi
             await conn.OpenAsync();
 
             return Results.Json(await DbUtils.ReadRows(conn, $"""
-                SELECT * FROM (
-                    SELECT * FROM reports_vs
-                    UNION ALL
-                    SELECT * FROM reports_so
-                ) x
-                ORDER BY created_at DESC
-                LIMIT {max}
-            """));
+                                                                  SELECT * FROM (
+                                                                      SELECT * FROM reports_vs
+                                                                      UNION ALL
+                                                                      SELECT * FROM reports_so
+                                                                  ) x
+                                                                  ORDER BY created_at DESC
+                                                                  LIMIT {max}
+                                                              """));
         });
 
         // GET | Returns users history of games from reports via id
