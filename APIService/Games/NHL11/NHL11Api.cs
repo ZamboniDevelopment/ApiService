@@ -156,11 +156,14 @@ public static class NHL11Api
             await conn.OpenAsync();
 
             var rows = await DbUtils.ReadRows(conn, """
-                                                        SELECT * FROM reports WHERE game_id=@id
-                                                        UNION ALL
-                                                        SELECT * FROM so_reports WHERE game_id=@id
-                                                        UNION ALL
-                                                        SELECT * FROM otp_reports WHERE game_id=@id
+                                                    SELECT game_id, user_id, home, score
+                                                    FROM reports WHERE game_id=@id
+                                                    UNION ALL
+                                                    SELECT game_id, user_id, home, score
+                                                    FROM so_reports WHERE game_id=@id
+                                                    UNION ALL
+                                                    SELECT game_id, user_id, home, score
+                                                    FROM otp_reports WHERE game_id=@id
                                                     """, new NpgsqlParameter("id", id));
 
             if (!rows.Any())
@@ -205,11 +208,18 @@ public static class NHL11Api
             await conn.OpenAsync();
 
             var userRows = await DbUtils.ReadRows(conn, """
-                                                            SELECT * FROM reports WHERE user_id=@id
+                                                            SELECT game_id, user_id, gamertag, team_name, score, created_at
+                                                            FROM reports WHERE user_id=@id
+
                                                             UNION ALL
-                                                            SELECT * FROM so_reports WHERE user_id=@id
+
+                                                            SELECT game_id, user_id, gamertag, team_name, score, created_at
+                                                            FROM so_reports WHERE user_id=@id
+
                                                             UNION ALL
-                                                            SELECT * FROM otp_reports WHERE user_id=@id
+
+                                                            SELECT game_id, user_id, gamertag, team_name, score, created_at
+                                                            FROM otp_reports WHERE user_id=@id
                                                         """, new NpgsqlParameter("id", id));
 
             if (!userRows.Any())
@@ -221,11 +231,18 @@ public static class NHL11Api
                 .ToArray();
 
             var allRows = await DbUtils.ReadRows(conn, """
-                                                           SELECT * FROM reports WHERE game_id = ANY(@ids)
+                                                           SELECT game_id, user_id, gamertag, team_name, score
+                                                           FROM reports WHERE game_id = ANY(@ids)
+
                                                            UNION ALL
-                                                           SELECT * FROM so_reports WHERE game_id = ANY(@ids)
+
+                                                           SELECT game_id, user_id, gamertag, team_name, score
+                                                           FROM so_reports WHERE game_id = ANY(@ids)
+
                                                            UNION ALL
-                                                           SELECT * FROM otp_reports WHERE game_id = ANY(@ids)
+
+                                                           SELECT game_id, user_id, gamertag, team_name, score
+                                                           FROM otp_reports WHERE game_id = ANY(@ids)
                                                        """, new NpgsqlParameter("ids", gameIds));
 
             foreach (var r in userRows)
