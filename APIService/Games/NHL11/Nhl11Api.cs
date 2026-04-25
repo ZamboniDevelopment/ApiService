@@ -1,10 +1,15 @@
-﻿using APIService.Config;
+﻿/*
+ *  NHL11API
+ *  TITLES: 11
+ */
+
+using APIService.Config;
 using APIService.Core;
 using Npgsql;
 
 namespace APIService.Games.NHL11;
 
-public static class NHL11Api
+public static class Nhl11Api
 {
     public static void Map(WebApplication app, GameConfig game)
     {

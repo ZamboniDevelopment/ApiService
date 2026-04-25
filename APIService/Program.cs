@@ -31,7 +31,7 @@ internal class Program
                 return true;
             }, "Invalid game configuration");
 
-        // Redis (fixed + prod-safe)
+        // Redis
         builder.Services.AddSingleton<ConnectionMultiplexer>(sp =>
         {
             var config = sp
@@ -65,7 +65,6 @@ internal class Program
                 queueLimit: 10
             ));
         builder.Services.AddEndpointsApiExplorer();
-
         var app = builder.Build();
         var config = app.Services
             .GetRequiredService<IOptions<ApiConfig>>()
@@ -74,13 +73,10 @@ internal class Program
             ? "0.0.0.0"
             : config.General.IP;
         app.Urls.Add($"http://{ip}:{config.General.Port}");
-
-        // Rate limits mw
         app.Use(async (ctx, next) =>
         {
             var limiter = ctx.RequestServices
                 .GetRequiredService<FixedWindowRateLimiter>();
-
             if (!await limiter.AllowRequestAsync())
             {
                 ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;
@@ -90,7 +86,6 @@ internal class Program
                 });
                 return;
             }
-
             await next();
         });
 
@@ -99,21 +94,26 @@ internal class Program
         {
             switch (game.Type)
             {
-                case GameType.NHLLegacy:
-                case GameType.NHL14:
-                    NHLSharedApi.Map(app, game);
+                // NhlSharedApi
+                case GameType.NhlLegacy:
+                case GameType.Nhl15:
+                case GameType.Nhl14:
+                case GameType.Nhl13:
+                case GameType.Nhl12:
+                    NhlSharedApi.Map(app, game);
+                    break;
+                
+                //Nhl11Api
+                case GameType.Nhl11:
+                    Nhl11Api.Map(app, game);
                     break;
 
-                case GameType.NHL11:
-                    NHL11Api.Map(app, game);
-                    break;
-
-                case GameType.NHL10:
+                //Nhl10Api
+                case GameType.Nhl10:
                     Nhl10Api.Map(app, game);
                     break;
             }
         }
-
         await app.RunAsync();
     }
 }

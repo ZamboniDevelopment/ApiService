@@ -1,4 +1,9 @@
-﻿using APIService.Config;
+﻿/*
+ *  NHLSharedAPI
+ *  TITLES: 13, 14, 15 & Legacy
+ */
+
+using APIService.Config;
 using APIService.Core;
 using Microsoft.AspNetCore.Builder;
 using Npgsql;
@@ -6,16 +11,11 @@ using System.Text.Json;
 
 namespace APIService.Games.NHL14Legacy;
 
-public static class NHLSharedApi
+public static class NhlSharedApi
 {
     public static void Map(WebApplication app, GameConfig game)
     {
         string prefix = "/" + game.RoutePrefix.Trim('/');
-
-        /*
-         * TODO: MISSING:
-         * nhllegacy/status, nhl14/status
-         */
         // GET | List of players (REDIS ROUTE)
         app.MapGet($"{prefix}/api/players", async (HttpContext ctx) =>
         {

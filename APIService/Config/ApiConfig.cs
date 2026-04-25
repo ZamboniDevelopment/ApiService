@@ -25,10 +25,13 @@ public class GeneralConfig
 
 public enum GameType
 {
-    NHLLegacy,
-    NHL14,
-    NHL11,
-    NHL10
+    NhlLegacy,
+    Nhl15,
+    Nhl14,
+    Nhl13,
+    Nhl12,
+    Nhl11,
+    Nhl10
 }
 
 public class GameConfig

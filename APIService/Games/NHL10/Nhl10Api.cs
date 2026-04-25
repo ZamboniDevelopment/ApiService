@@ -1,4 +1,9 @@
-﻿using APIService.Config;
+﻿/*
+ *  NHL10API
+ *  TITLES: 10
+ */
+
+using APIService.Config;
 using APIService.Core;
 using Npgsql;
 using System.Text.Json;
