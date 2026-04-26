@@ -17,22 +17,25 @@ public static class Nhl12Api
 
         /*
          * TODO: MISSING:
-         * nhl12/status
+         * nhl11/status
          */
 
+        //32->64
         static long L(object? v)
             => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
 
+        // 64->32
         static int I(object? v)
             => v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
 
+        // GET | Returns players list 
         app.MapGet($"{prefix}/api/players", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
             var rows = await DbUtils.ReadRows(conn, """
-                                                        SELECT DISTINCT gamertag FROM report_l
+                                                        SELECT DISTINCT gamertag FROM reports_l
                                                         UNION
                                                         SELECT DISTINCT gamertag FROM so_reports_l
                                                     """);
@@ -40,13 +43,14 @@ public static class Nhl12Api
             return Results.Json(rows.Select(r => r["gamertag"]));
         });
 
+        // GET | Returns player info via gamertag
         app.MapGet($"{prefix}/api/player/{{gamertag}}", async (string gamertag) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
             var rows = await DbUtils.ReadRows(conn, """
-                                                        SELECT user_id, score FROM report_l WHERE gamertag=@gt
+                                                        SELECT user_id, score FROM reports_l WHERE gamertag=@gt
                                                         UNION ALL
                                                         SELECT user_id, score FROM so_reports_l WHERE gamertag=@gt
                                                     """, new NpgsqlParameter("gt", gamertag));
@@ -63,6 +67,7 @@ public static class Nhl12Api
             });
         });
 
+        // GET | Return the games lists
         app.MapGet($"{prefix}/api/games", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -71,7 +76,7 @@ public static class Nhl12Api
             var games = await DbUtils.ReadRows(conn,
                 "SELECT * FROM games_l ORDER BY created_at DESC");
 
-            var vs = await DbUtils.ReadRows(conn, "SELECT * FROM report_l");
+            var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports_l");
             var so = await DbUtils.ReadRows(conn, "SELECT * FROM so_reports_l");
 
             var vsByGame = vs.GroupBy(r => L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
@@ -114,6 +119,7 @@ public static class Nhl12Api
             });
         });
 
+        // GET | Reports via game id
         app.MapGet($"{prefix}/api/game/{{id:long}}/reports", async (long id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -122,7 +128,7 @@ public static class Nhl12Api
             return Results.Json(new
             {
                 VS = await DbUtils.ReadRows(conn,
-                    "SELECT * FROM report_l WHERE game_id=@id",
+                    "SELECT * FROM reports_l WHERE game_id=@id",
                     new NpgsqlParameter("id", id)
                 ),
 
@@ -133,6 +139,7 @@ public static class Nhl12Api
             });
         });
 
+        // GET | Summary of game via id
         app.MapGet($"{prefix}/api/games/{{id:long}}/summary", async (long id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -140,7 +147,7 @@ public static class Nhl12Api
 
             var rows = await DbUtils.ReadRows(conn, """
                                                     SELECT game_id, user_id, home, score
-                                                    FROM report_l WHERE game_id=@id
+                                                    FROM reports_l WHERE game_id=@id
                                                     UNION ALL
                                                     SELECT game_id, user_id, home, score
                                                     FROM so_reports_l WHERE game_id=@id
@@ -160,6 +167,7 @@ public static class Nhl12Api
             });
         });
 
+        // GET | Latest reports via limit
         app.MapGet($"{prefix}/api/reports/latest", async (int? limit) =>
         {
             int max = Math.Clamp(limit ?? 50, 1, 500);
@@ -169,7 +177,7 @@ public static class Nhl12Api
 
             return Results.Json(await DbUtils.ReadRows(conn, $"""
                                                                   SELECT * FROM (
-                                                                      SELECT * FROM report_l
+                                                                      SELECT * FROM reports_l
                                                                       UNION ALL
                                                                       SELECT * FROM so_reports_l
                                                                   ) x
@@ -178,6 +186,7 @@ public static class Nhl12Api
                                                               """));
         });
 
+        // GET | Users game history
         app.MapGet($"{prefix}/api/user/{{id:long}}/history", async (long id) =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -185,7 +194,7 @@ public static class Nhl12Api
 
             var userRows = await DbUtils.ReadRows(conn, """
                                                             SELECT game_id, user_id, gamertag, team_name, score, created_at
-                                                            FROM report_l WHERE user_id=@id
+                                                            FROM reports_l WHERE user_id=@id
 
                                                             UNION ALL
 
@@ -203,7 +212,7 @@ public static class Nhl12Api
 
             var allRows = await DbUtils.ReadRows(conn, """
                                                            SELECT game_id, user_id, gamertag, team_name, score
-                                                           FROM report_l WHERE game_id = ANY(@ids)
+                                                           FROM reports_l WHERE game_id = ANY(@ids)
 
                                                            UNION ALL
 
@@ -229,6 +238,7 @@ public static class Nhl12Api
             return Results.Json(userRows);
         });
 
+        // GET | Leaderboard with range selection
         app.MapGet($"{prefix}/api/leaderboard/{{range}}", async (string range) =>
         {
             var from = DbUtils.RangeToDate(range);
@@ -239,7 +249,7 @@ public static class Nhl12Api
             var sql = """
                           SELECT gamertag, SUM(score) AS total_goals, COUNT(*) AS games_played
                           FROM (
-                              SELECT gamertag, score, created_at FROM report_l
+                              SELECT gamertag, score, created_at FROM reports_l
                               UNION ALL
                               SELECT gamertag, score, created_at FROM so_reports_l
                           ) x
@@ -269,6 +279,7 @@ public static class Nhl12Api
             return Results.Json(list);
         });
 
+        // GET | Global stats
         app.MapGet($"{prefix}/api/stats/global", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -282,7 +293,7 @@ public static class Nhl12Api
             var reports = Convert.ToInt32(
                 await new NpgsqlCommand("""
                                             SELECT COUNT(*) FROM (
-                                                SELECT game_id FROM report_l
+                                                SELECT game_id FROM reports_l
                                                 UNION ALL
                                                 SELECT game_id FROM so_reports_l
                                             ) x
@@ -292,7 +303,7 @@ public static class Nhl12Api
             var players = Convert.ToInt32(
                 await new NpgsqlCommand("""
                                             SELECT COUNT(DISTINCT gamertag) FROM (
-                                                SELECT gamertag FROM report_l
+                                                SELECT gamertag FROM reports_l
                                                 UNION
                                                 SELECT gamertag FROM so_reports_l
                                             ) x
@@ -307,6 +318,7 @@ public static class Nhl12Api
             });
         });
 
+        // GET | Returns raw games from games_l table
         app.MapGet($"{prefix}/api/raw/games", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -316,14 +328,15 @@ public static class Nhl12Api
                 await DbUtils.ReadRows(conn, "SELECT * FROM games_l")
             );
         });
-        
+
+        // GET | Returns raw reports from reports_l table
         app.MapGet($"{prefix}/api/raw/reports", async () =>
         {
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
             await conn.OpenAsync();
 
             return Results.Json(
-                await DbUtils.ReadRows(conn, "SELECT * FROM report_l")
+                await DbUtils.ReadRows(conn, "SELECT * FROM reports_l")
             );
         });
     }
