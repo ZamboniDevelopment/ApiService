@@ -2,6 +2,7 @@
 using APIService.Core;
 using APIService.Games.NHL10;
 using APIService.Games.NHL11;
+using APIService.Games.NHL12;
 using APIService.Games.NHL14Legacy;
 using StackExchange.Redis;
 using Microsoft.Extensions.Options;
@@ -99,8 +100,12 @@ internal class Program
                 case GameType.Nhl15:
                 case GameType.Nhl14:
                 case GameType.Nhl13:
-                case GameType.Nhl12:
                     NhlSharedApi.Map(app, game);
+                    break;
+                
+                //Nhl12Api
+                case GameType.Nhl12:
+                    Nhl12Api.Map(app, game);
                     break;
                 
                 //Nhl11Api
