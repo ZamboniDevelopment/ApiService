@@ -4,6 +4,7 @@ using APIService.Games.NHL10;
 using APIService.Games.NHL11;
 using APIService.Games.NHL12;
 using APIService.Games.NHL14Legacy;
+using APIService.Games.HUT;
 using StackExchange.Redis;
 using Microsoft.Extensions.Options;
 
@@ -116,6 +117,11 @@ internal class Program
                 //Nhl10Api
                 case GameType.Nhl10:
                     Nhl10Api.Map(app, game);
+                    break;
+
+                //HutApi
+                case GameType.Hut:
+                    HutApi.Map(app, game);
                     break;
             }
         }
