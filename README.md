@@ -40,4 +40,11 @@ Supported Games:
 
 [Code can be found here. (Github)](https://github.com/ZamboniDevelopment/ApiService/blob/master/APIService/Games/NHL14Legacy/NHLSharedApi.cs)
 
+### HutApi
+Supported Games:
+- NHL 12
+
+**TODO: Create docs to wiki**
+
+[Code can be found here. (Github)](https://github.com/ZamboniDevelopment/ApiService/blob/master/APIService/Games/HUT/HutApi.cs)
 ---
