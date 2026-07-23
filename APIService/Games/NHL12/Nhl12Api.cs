@@ -176,13 +176,12 @@ public static class Nhl12Api
             await conn.OpenAsync();
 
             return Results.Json(await DbUtils.ReadRows(conn, $"""
-                                                                  SELECT * FROM (
-                                                                      SELECT * FROM reports_l
-                                                                      UNION ALL
-                                                                      SELECT * FROM so_reports_l
-                                                                  ) x
-                                                                  ORDER BY created_at DESC
-                                                                  LIMIT {max}
+                                                                  SELECT *
+                                                                  FROM (
+                                                                  SELECT game_id, user_id, gamertag, name, team, team_name, score, home, quit, created_at, 'VS' AS report_type FROM reports_l
+                                                                  UNION ALL
+                                                                  SELECT game_id, user_id, gamertag, name, team, team_name, score, home, quit, created_at,'SO' AS report_type FROM so_reports_l 
+                                                                  ) x ORDER BY created_at DESC LIMIT {max}
                                                               """));
         });
 

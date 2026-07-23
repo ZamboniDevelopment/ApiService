@@ -395,10 +395,11 @@ public static class NhlSharedApi
             await conn.OpenAsync();
 
             return Results.Json(await DbUtils.ReadRows(conn, $"""
-                                                                  SELECT * FROM (
-                                                                      SELECT * FROM reports_vs
-                                                                      UNION ALL
-                                                                      SELECT * FROM reports_so
+                                                                  SELECT *
+                                                                  FROM (
+                                                                  SELECT game_id, user_id, gtag, name, team, tnam AS team_name, scor AS score, home, quit, created_at, 'VS' AS report_type FROM reports_vs
+                                                                  UNION ALL
+                                                                  SELECT game_id, user_id, gtag, name, team, tnam AS team_name, scor AS score, home, quit, created_at, 'SO' AS report_type FROM reports_so
                                                                   ) x
                                                                   ORDER BY created_at DESC
                                                                   LIMIT {max}
