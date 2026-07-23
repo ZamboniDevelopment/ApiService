@@ -202,7 +202,7 @@ public static class HutApi
         app.MapGet($"{prefix}/api/hut/manager/{{userId:long}}/cards",
             async (long userId, int? deck, int? state, int? limit, int? offset) =>
         {
-            int max = Math.Clamp(limit ?? 100, 1, 1000);
+            int max = Math.Clamp(limit ?? 100, 1, 5000);
             int skip = Math.Max(offset ?? 0, 0);
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
