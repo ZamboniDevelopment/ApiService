@@ -20,14 +20,6 @@ public static class Nhl12Api
          * nhl11/status
          */
 
-        //32->64
-        static long L(object? v)
-            => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
-
-        // 64->32
-        static int I(object? v)
-            => v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
-
         // GET | Returns players list 
         app.MapGet($"{prefix}/api/players", async () =>
         {
@@ -63,7 +55,7 @@ public static class Nhl12Api
                 userId = rows[0]["user_id"],
                 playerName = gamertag,
                 totalGames = rows.Count,
-                totalGoals = rows.Sum(r => I(r["score"]))
+                totalGoals = rows.Sum(r => Helper.I(r["score"]))
             });
         });
 
@@ -79,8 +71,8 @@ public static class Nhl12Api
             var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports_l");
             var so = await DbUtils.ReadRows(conn, "SELECT * FROM so_reports_l");
 
-            var vsByGame = vs.GroupBy(r => L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
-            var soByGame = so.GroupBy(r => L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
+            var vsByGame = vs.GroupBy(r => Helper.L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
+            var soByGame = so.GroupBy(r => Helper.L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
 
             object BuildGame(Dictionary<string, object?> g, List<Dictionary<string, object?>> reps)
                 => new
@@ -91,9 +83,9 @@ public static class Nhl12Api
                     gtyp = g["gtyp"],
                     venue = g["venue"],
                     players = reps.Count,
-                    totalGoals = reps.Sum(r => I(r["score"])),
-                    avgFps = reps.Any() ? reps.Average(r => I(r["fpsavg"])) : 0,
-                    avgLatency = reps.Any() ? reps.Average(r => I(r["lateavgnet"])) : 0,
+                    totalGoals = reps.Sum(r => Helper.I(r["score"])),
+                    avgFps = reps.Any() ? reps.Average(r => Helper.I(r["fpsavg"])) : 0,
+                    avgLatency = reps.Any() ? reps.Average(r => Helper.I(r["lateavgnet"])) : 0,
                     teams = reps.Select(r => new
                     {
                         team_name = r["team_name"],
@@ -110,12 +102,12 @@ public static class Nhl12Api
             return Results.Json(new
             {
                 VS = games
-                    .Where(g => vsByGame.ContainsKey(L(g["game_id"])))
-                    .Select(g => BuildGame(g, vsByGame[L(g["game_id"])])),
+                    .Where(g => vsByGame.ContainsKey(Helper.L(g["game_id"])))
+                    .Select(g => BuildGame(g, vsByGame[Helper.L(g["game_id"])])),
 
                 SO = games
-                    .Where(g => soByGame.ContainsKey(L(g["game_id"])))
-                    .Select(g => BuildGame(g, soByGame[L(g["game_id"])]))
+                    .Where(g => soByGame.ContainsKey(Helper.L(g["game_id"])))
+                    .Select(g => BuildGame(g, soByGame[Helper.L(g["game_id"])]))
             });
         });
 

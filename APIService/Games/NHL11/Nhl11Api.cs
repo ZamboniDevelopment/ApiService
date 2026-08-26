@@ -20,14 +20,6 @@ public static class Nhl11Api
          * nhl11/status
          */
 
-        //32->64
-        static long L(object? v)
-            => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
-
-        // 64->32
-        static int I(object? v)
-            => v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
-
         // GET | Returns players list 
         app.MapGet($"{prefix}/api/players", async () =>
         {
@@ -39,7 +31,7 @@ public static class Nhl11Api
                                                         UNION
                                                         SELECT DISTINCT gamertag FROM so_reports
                                                         UNION
-                                                        SELECT DISTINCT gamertag FROM otp_reports
+                                                        SELECT DISTINCT gamertag FROM otp_reportsl
                                                     """);
 
             return Results.Json(rows.Select(r => r["gamertag"]));
@@ -56,7 +48,7 @@ public static class Nhl11Api
                                                         UNION ALL
                                                         SELECT user_id, score FROM so_reports WHERE gamertag=@gt
                                                         UNION ALL
-                                                        SELECT user_id, score FROM otp_reports WHERE gamertag=@gt
+                                                        SELECT user_id, score FROM otp_reportsl WHERE gamertag=@gt
                                                     """, new NpgsqlParameter("gt", gamertag));
 
             if (rows.Count == 0)
@@ -67,7 +59,7 @@ public static class Nhl11Api
                 userId = rows[0]["user_id"],
                 playerName = gamertag,
                 totalGames = rows.Count,
-                totalGoals = rows.Sum(r => I(r["score"]))
+                totalGoals = rows.Sum(r => Helper.I(r["score"]))
             });
         });
 
@@ -82,11 +74,11 @@ public static class Nhl11Api
 
             var vs = await DbUtils.ReadRows(conn, "SELECT * FROM reports");
             var so = await DbUtils.ReadRows(conn, "SELECT * FROM so_reports");
-            var otp = await DbUtils.ReadRows(conn, "SELECT * FROM otp_reports");
+            var otp = await DbUtils.ReadRows(conn, "SELECT * FROM otp_reportsl");
 
-            var vsByGame = vs.GroupBy(r => L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
-            var soByGame = so.GroupBy(r => L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
-            var otpByGame = otp.GroupBy(r => L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
+            var vsByGame = vs.GroupBy(r => Helper.L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
+            var soByGame = so.GroupBy(r => Helper.L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
+            var otpByGame = otp.GroupBy(r => Helper.L(r["game_id"])).ToDictionary(g => g.Key, g => g.ToList());
 
             object BuildGame(Dictionary<string, object?> g, List<Dictionary<string, object?>> reps)
                 => new
@@ -97,9 +89,9 @@ public static class Nhl11Api
                     gtyp = g["gtyp"],
                     venue = g["venue"],
                     players = reps.Count,
-                    totalGoals = reps.Sum(r => I(r["score"])),
-                    avgFps = reps.Any() ? reps.Average(r => I(r["fpsavg"])) : 0,
-                    avgLatency = reps.Any() ? reps.Average(r => I(r["lateavgnet"])) : 0,
+                    totalGoals = reps.Sum(r => Helper.I(r["score"])),
+                    avgFps = reps.Any() ? reps.Average(r => Helper.I(r["fpsavg"])) : 0,
+                    avgLatency = reps.Any() ? reps.Average(r => Helper.I(r["lateavgnet"])) : 0,
                     teams = reps.Select(r => new
                     {
                         team_name = r["team_name"],
@@ -116,16 +108,16 @@ public static class Nhl11Api
             return Results.Json(new
             {
                 VS = games
-                    .Where(g => vsByGame.ContainsKey(L(g["game_id"])))
-                    .Select(g => BuildGame(g, vsByGame[L(g["game_id"])])),
+                    .Where(g => vsByGame.ContainsKey(Helper.L(g["game_id"])))
+                    .Select(g => BuildGame(g, vsByGame[Helper.L(g["game_id"])])),
 
                 SO = games
-                    .Where(g => soByGame.ContainsKey(L(g["game_id"])))
-                    .Select(g => BuildGame(g, soByGame[L(g["game_id"])])),
+                    .Where(g => soByGame.ContainsKey(Helper.L(g["game_id"])))
+                    .Select(g => BuildGame(g, soByGame[Helper.L(g["game_id"])])),
 
                 OTP = games
-                    .Where(g => otpByGame.ContainsKey(L(g["game_id"])))
-                    .Select(g => BuildGame(g, otpByGame[L(g["game_id"])]))
+                    .Where(g => otpByGame.ContainsKey(Helper.L(g["game_id"])))
+                    .Select(g => BuildGame(g, otpByGame[Helper.L(g["game_id"])]))
             });
         });
 
@@ -148,7 +140,7 @@ public static class Nhl11Api
                 ),
 
                 OTP = await DbUtils.ReadRows(conn,
-                    "SELECT * FROM otp_reports WHERE game_id=@id",
+                    "SELECT * FROM otp_reportsl WHERE game_id=@id",
                     new NpgsqlParameter("id", id)
                 )
             });
@@ -168,7 +160,7 @@ public static class Nhl11Api
                                                     FROM so_reports WHERE game_id=@id
                                                     UNION ALL
                                                     SELECT game_id, user_id, home, score
-                                                    FROM otp_reports WHERE game_id=@id
+                                                    FROM otp_reportsl WHERE game_id=@id
                                                     """, new NpgsqlParameter("id", id));
 
             if (!rows.Any())
@@ -203,7 +195,7 @@ public static class Nhl11Api
                                                                   FROM so_reports
                                                                   UNION ALL
                                                                   SELECT game_id,user_id,gamertag,name,team,team_name,score,home,quit,created_at,'OTP' AS report_type
-                                                                  FROM otp_reports
+                                                                  FROM otp_reportsl
                                                                   ) x
                                                                   ORDER BY created_at DESC
                                                                   LIMIT {max}
@@ -228,7 +220,7 @@ public static class Nhl11Api
                                                             UNION ALL
 
                                                             SELECT game_id, user_id, gamertag, team_name, score, created_at
-                                                            FROM otp_reports WHERE user_id=@id
+                                                            FROM otp_reportsl WHERE user_id=@id
                                                         """, new NpgsqlParameter("id", id));
 
             if (!userRows.Any())
@@ -251,7 +243,7 @@ public static class Nhl11Api
                                                            UNION ALL
 
                                                            SELECT game_id, user_id, gamertag, team_name, score
-                                                           FROM otp_reports WHERE game_id = ANY(@ids)
+                                                           FROM otp_reportsl WHERE game_id = ANY(@ids)
                                                        """, new NpgsqlParameter("ids", gameIds));
 
             foreach (var r in userRows)
@@ -287,7 +279,7 @@ public static class Nhl11Api
                               UNION ALL
                               SELECT gamertag, score, created_at FROM so_reports
                               UNION ALL
-                              SELECT gamertag, score, created_at FROM otp_reports
+                              SELECT gamertag, score, created_at FROM otp_reportsl
                           ) x
                           WHERE (@from = '0001-01-01'::timestamp OR created_at >= @from)
                           GROUP BY gamertag
@@ -333,7 +325,7 @@ public static class Nhl11Api
                                                 UNION ALL
                                                 SELECT game_id FROM so_reports
                                                 UNION ALL
-                                                SELECT game_id FROM otp_reports
+                                                SELECT game_id FROM otp_reportsl
                                             ) x
                                         """, conn).ExecuteScalarAsync()
             );
@@ -345,7 +337,7 @@ public static class Nhl11Api
                                                 UNION
                                                 SELECT gamertag FROM so_reports
                                                 UNION
-                                                SELECT gamertag FROM otp_reports
+                                                SELECT gamertag FROM otp_reportsl
                                             ) x
                                         """, conn).ExecuteScalarAsync()
             );

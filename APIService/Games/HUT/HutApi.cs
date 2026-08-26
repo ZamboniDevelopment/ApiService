@@ -14,6 +14,7 @@ namespace APIService.Games.HUT;
 
 public static class HutApi
 {
+    // helpers
     private static readonly Regex IdentRegex =
         new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
     private static string Ident(string name)
@@ -22,6 +23,8 @@ public static class HutApi
             throw new InvalidOperationException($"Invalid catalog table name: '{name}'");
         return name;
     }
+    
+    // structs
     private static string CardState(object? v) => Convert.ToInt32(v ?? 0) switch
     {
         1 => "Free",
@@ -79,8 +82,8 @@ public static class HutApi
         5 => "GK",
         _ => "Unknown"
     };
-    private static long L(object? v)
-        => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
+    
+    // more helpers
     private static int ArrAt(object? arrObj, int i)
         => arrObj is int[] a && a.Length > i ? a[i] : 0;
     private static object Record(object? statsObj)

@@ -151,9 +151,6 @@ public static class NhlSharedApi
             var vsReports = await DbUtils.ReadRows(conn, "SELECT * FROM reports_vs");
             var soReports = await DbUtils.ReadRows(conn, "SELECT * FROM reports_so");
 
-            static long L(object? v)
-                => v == null || v == DBNull.Value ? 0L : Convert.ToInt64(v);
-
             var vsByGame = vsReports
                 .GroupBy(r => Convert.ToInt64(r["game_id"]))
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -180,9 +177,9 @@ public static class NhlSharedApi
                         venue = g.GetValueOrDefault("venue"),
 
                         players = reps.Count,
-                        totalGoals = reps.Sum(r => L(r["scor"])),
-                        avgFps = reps.Any() ? reps.Average(r => L(r["fpsavg"])) : 0,
-                        avgLatency = reps.Any() ? reps.Average(r => L(r["lateavgnet"])) : 0,
+                        totalGoals = reps.Sum(r => Helper.L(r["scor"])),
+                        avgFps = reps.Any() ? reps.Average(r => Helper.L(r["fpsavg"])) : 0,
+                        avgLatency = reps.Any() ? reps.Average(r => Helper.L(r["lateavgnet"])) : 0,
 
                         teams = reps.Select(r => new
                         {
@@ -210,9 +207,9 @@ public static class NhlSharedApi
                         venue = g.GetValueOrDefault("venue"),
 
                         players = reps.Count,
-                        totalGoals = reps.Sum(r => L(r["scor"])),
-                        avgFps = reps.Any() ? reps.Average(r => L(r["fpsavg"])) : 0,
-                        avgLatency = reps.Any() ? reps.Average(r => L(r["lateavgnet"])) : 0,
+                        totalGoals = reps.Sum(r => Helper.L(r["scor"])),
+                        avgFps = reps.Any() ? reps.Average(r => Helper.L(r["fpsavg"])) : 0,
+                        avgLatency = reps.Any() ? reps.Average(r => Helper.L(r["lateavgnet"])) : 0,
 
                         teams = reps.Select(r => new
                         {
