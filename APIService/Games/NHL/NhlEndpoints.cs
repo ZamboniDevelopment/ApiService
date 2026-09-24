@@ -145,28 +145,47 @@ public static class NhlEndpoints
     }
 
     private static object BuildGameSummary(
-        Dictionary<string, object?> g, List<Dictionary<string, object?>> reps, NhlColumns cols) => new
+        Dictionary<string, object?> g, List<Dictionary<string, object?>> reps, NhlColumns cols)
     {
-        game_id = g.GetValueOrDefault("game_id"),
-        created_at = g.GetValueOrDefault("created_at"),
-        fnsh = g.GetValueOrDefault("fnsh"),
-        gtyp = g.GetValueOrDefault("gtyp"),
-        venue = g.GetValueOrDefault("venue"),
-        players = reps.Count,
-        totalGoals = reps.Sum(r => Helper.I(r[cols.Score])),
-        avgFps = reps.Count > 0 ? reps.Average(r => Helper.I(r["fpsavg"])) : 0,
-        avgLatency = reps.Count > 0 ? reps.Average(r => Helper.I(r["lateavgnet"])) : 0,
-        teams = reps.Select(r => new
+        const double MaxLatencyCap = 1_000_000.0;
+        return new
         {
-            team_name = r.GetValueOrDefault(cols.TeamName),
-            score = r.GetValueOrDefault(cols.Score),
-            shots = r.GetValueOrDefault(cols.Shots),
-            hits = r.GetValueOrDefault("hits"),
-            gamertag = r.GetValueOrDefault(cols.GamerTag)
-        }),
-        status = Convert.ToBoolean(g.GetValueOrDefault("fnsh") ?? false) ? "Finished" : "In Progress"
-    };
+            game_id = g.GetValueOrDefault("game_id"),
+            created_at = g.GetValueOrDefault("created_at"),
+            fnsh = g.GetValueOrDefault("fnsh"),
+            gtyp = g.GetValueOrDefault("gtyp"),
+            venue = g.GetValueOrDefault("venue"),
+            players = reps.Count,
+            totalGoals = reps.Sum(r => Helper.I(r[cols.Score])),
+        
+            avgFps = reps.Count > 0 
+                ? Math.Round(reps.Average(r => Convert.ToDouble(r["fpsavg"] ?? 0)), 2) 
+                : 0.0,
 
+            // ea moment
+            avgLatency = reps.Count > 0 
+                ? Math.Round(reps.Average(r => 
+                    Math.Min(Convert.ToDouble(r["lateavgnet"] ?? 0), MaxLatencyCap)), 2) 
+                : 0.0,
+            avgTeamLatency = reps.Count > 0 
+                ? Math.Round(reps.Average(r => 
+                    Math.Min(Convert.ToDouble(r["ltean"] ?? r["ltennet"] ?? 0), MaxLatencyCap)), 2) 
+                : 0.0,
+
+            teams = reps.Select(r => new
+            {
+                team_name = r.GetValueOrDefault(cols.TeamName),
+                score = r.GetValueOrDefault(cols.Score),
+                shots = r.GetValueOrDefault(cols.Shots),
+                hits = r.GetValueOrDefault("hits"),
+                gamertag = r.GetValueOrDefault(cols.GamerTag),
+                netLatency = Math.Min(Convert.ToDouble(r.GetValueOrDefault("lateavgnet") ?? 0), MaxLatencyCap),
+                teamLatency = Math.Min(Convert.ToDouble(r.GetValueOrDefault("ltean") ?? r.GetValueOrDefault("ltennet") ?? 0), MaxLatencyCap)
+            }),
+            status = Convert.ToBoolean(g.GetValueOrDefault("fnsh") ?? false) ? "Finished" : "In Progress"
+        };
+    }
+    
     // GET /api/game/{id:long}/reports
     private static void MapGameReports(WebApplication app, GameConfig game, NhlSchema schema, string prefix)
     {
