@@ -2,6 +2,7 @@
  *  NHLSharedAPI
  *  TITLES: 13, 14, 15 & Legacy
  */
+// Deprecated  & Dead Code
 
 using APIService.Config;
 using APIService.Core;
@@ -26,7 +27,7 @@ public static class NhlSharedApi
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -61,7 +62,7 @@ public static class NhlSharedApi
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -307,7 +308,7 @@ public static class NhlSharedApi
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             var from = DbUtils.RangeToDate(range);

@@ -8,22 +8,14 @@ using APIService.Core;
 using Npgsql;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace APIService.Games.HUT;
 
 public static class HutApi
 {
     // helpers
-    private static readonly Regex IdentRegex =
-        new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
-    private static string Ident(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name) || !IdentRegex.IsMatch(name))
-            throw new InvalidOperationException($"Invalid catalog table name: '{name}'");
-        return name;
-    }
-    
+    private static string Ident(string name) => SqlIdent.Validate(name);
+
     // structs
     private static string CardState(object? v) => Convert.ToInt32(v ?? 0) switch
     {
@@ -469,54 +461,50 @@ public static class HutApi
             var redis = cacheable ? RedisUtils.GetDatabase(ctx) : null;
             string key = $"hut:{game.RoutePrefix}:players:{max}";
 
-            if (redis != null)
-            {
-                var cached = await redis.StringGetAsync(key);
-                if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
-            }
+            var json = await CacheHelper.GetOrComputeJsonAsync(
+                redis, key, cacheable ? TimeSpan.FromSeconds(60) : null,
+                async () =>
+                {
+                    await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
+                    await conn.OpenAsync();
 
-            await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
-            await conn.OpenAsync();
+                    var sql = new StringBuilder($"""
+                        SELECT carddbid, firstname, lastname, commonname, rating,
+                               fieldpos, preferredposition, nation, teamid, rare
+                        FROM {tPlayers} WHERE 1=1
+                    """);
+                    var ps = new List<NpgsqlParameter>();
 
-            var sql = new StringBuilder($"""
-                SELECT carddbid, firstname, lastname, commonname, rating,
-                       fieldpos, preferredposition, nation, teamid, rare
-                FROM {tPlayers} WHERE 1=1
-            """);
-            var ps = new List<NpgsqlParameter>();
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        sql.Append(" AND (firstname ILIKE @n OR lastname ILIKE @n OR commonname ILIKE @n)");
+                        ps.Add(new("n", $"%{name}%"));
+                    }
+                    if (team.HasValue) { sql.Append(" AND teamid=@team"); ps.Add(new("team", team.Value)); }
+                    if (position.HasValue) { sql.Append(" AND fieldpos=@pos"); ps.Add(new("pos", position.Value)); }
+                    if (minRating.HasValue) { sql.Append(" AND rating>=@mr"); ps.Add(new("mr", minRating.Value)); }
+                    if (rare.HasValue) { sql.Append(" AND rare=@rare"); ps.Add(new("rare", rare.Value)); }
 
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                sql.Append(" AND (firstname ILIKE @n OR lastname ILIKE @n OR commonname ILIKE @n)");
-                ps.Add(new("n", $"%{name}%"));
-            }
-            if (team.HasValue) { sql.Append(" AND teamid=@team"); ps.Add(new("team", team.Value)); }
-            if (position.HasValue) { sql.Append(" AND fieldpos=@pos"); ps.Add(new("pos", position.Value)); }
-            if (minRating.HasValue) { sql.Append(" AND rating>=@mr"); ps.Add(new("mr", minRating.Value)); }
-            if (rare.HasValue) { sql.Append(" AND rare=@rare"); ps.Add(new("rare", rare.Value)); }
+                    sql.Append($" ORDER BY rating DESC, lastname ASC LIMIT {max} OFFSET {skip}");
 
-            sql.Append($" ORDER BY rating DESC, lastname ASC LIMIT {max} OFFSET {skip}");
+                    var rows = await DbUtils.ReadRows(conn, sql.ToString(), ps.ToArray());
 
-            var rows = await DbUtils.ReadRows(conn, sql.ToString(), ps.ToArray());
+                    var result = rows.Select(r => new
+                    {
+                        dbId = r["carddbid"],
+                        name = r["commonname"] ?? $"{r["firstname"]} {r["lastname"]}".Trim(),
+                        firstName = r["firstname"],
+                        lastName = r["lastname"],
+                        rating = r["rating"],
+                        position = Position(r["fieldpos"]),
+                        preferredPosition = r["preferredposition"],
+                        nation = r["nation"],
+                        teamId = r["teamid"],
+                        rare = r["rare"]
+                    });
 
-            var result = rows.Select(r => new
-            {
-                dbId = r["carddbid"],
-                name = r["commonname"] ?? $"{r["firstname"]} {r["lastname"]}".Trim(),
-                firstName = r["firstname"],
-                lastName = r["lastname"],
-                rating = r["rating"],
-                position = Position(r["fieldpos"]),
-                preferredPosition = r["preferredposition"],
-                nation = r["nation"],
-                teamId = r["teamid"],
-                rare = r["rare"]
-            });
-
-            var json = JsonSerializer.Serialize(result);
-            if (redis != null)
-                await redis.StringSetAsync(key, json, TimeSpan.FromSeconds(60));
+                    return JsonSerializer.Serialize(result);
+                });
 
             return Results.Text(json, "application/json");
         });

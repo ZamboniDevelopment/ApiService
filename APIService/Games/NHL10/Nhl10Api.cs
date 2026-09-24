@@ -2,6 +2,7 @@
  *  NHL10API
  *  TITLES: 10
  */
+// Deprecated  & Dead Code
 
 using APIService.Config;
 using APIService.Core;
@@ -31,7 +32,7 @@ public static class Nhl10Api
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -59,7 +60,7 @@ public static class Nhl10Api
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -118,7 +119,7 @@ public static class Nhl10Api
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);
@@ -205,7 +206,7 @@ public static class Nhl10Api
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             var from = DbUtils.RangeToDate(range);
@@ -259,7 +260,7 @@ public static class Nhl10Api
             {
                 var cached = await redis.StringGetAsync(key);
                 if (cached.HasValue)
-                    return Results.Text(cached!, "application/json");
+                    return Results.Text((string)cached!, "application/json");
             }
 
             await using var conn = new NpgsqlConnection(game.DatabaseConnectionString);

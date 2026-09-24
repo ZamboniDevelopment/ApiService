@@ -1,10 +1,5 @@
 ﻿using APIService.Config;
 using APIService.Core;
-using APIService.Games.NHL10;
-using APIService.Games.NHL11;
-using APIService.Games.NHL12;
-using APIService.Games.NHL14Legacy;
-using APIService.Games.HUT;
 using StackExchange.Redis;
 using Microsoft.Extensions.Options;
 
@@ -94,36 +89,7 @@ internal class Program
         // Map games
         foreach (var game in config.Games.Values.Where(g => g.Enabled))
         {
-            switch (game.Type)
-            {
-                // NhlSharedApi
-                case GameType.NhlLegacy:
-                case GameType.Nhl15:
-                case GameType.Nhl14:
-                case GameType.Nhl13:
-                    NhlSharedApi.Map(app, game);
-                    break;
-                
-                //Nhl12Api
-                case GameType.Nhl12:
-                    Nhl12Api.Map(app, game);
-                    break;
-                
-                //Nhl11Api
-                case GameType.Nhl11:
-                    Nhl11Api.Map(app, game);
-                    break;
-
-                //Nhl10Api
-                case GameType.Nhl10:
-                    Nhl10Api.Map(app, game);
-                    break;
-
-                //HutApi
-                case GameType.Hut:
-                    HutApi.Map(app, game);
-                    break;
-            }
+            GameCatalog.Map(app, game);
         }
         await app.RunAsync();
     }
