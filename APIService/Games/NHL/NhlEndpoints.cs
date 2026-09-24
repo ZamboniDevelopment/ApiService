@@ -157,21 +157,14 @@ public static class NhlEndpoints
             venue = g.GetValueOrDefault("venue"),
             players = reps.Count,
             totalGoals = reps.Sum(r => Helper.I(r[cols.Score])),
-        
-            avgFps = reps.Count > 0 
-                ? Math.Round(reps.Average(r => Convert.ToDouble(r["fpsavg"] ?? 0)), 2) 
-                : 0.0,
+            avgFps = reps.Count > 0 ? reps.Average(r => Helper.I(r["fpsavg"])) : 0,
 
             // ea moment
             avgLatency = reps.Count > 0 
                 ? Math.Round(reps.Average(r => 
                     Math.Min(Convert.ToDouble(r["lateavgnet"] ?? 0), MaxLatencyCap)), 2) 
                 : 0.0,
-            avgTeamLatency = reps.Count > 0 
-                ? Math.Round(reps.Average(r => 
-                    Math.Min(Convert.ToDouble(r["ltean"] ?? r["ltennet"] ?? 0), MaxLatencyCap)), 2) 
-                : 0.0,
-
+            
             teams = reps.Select(r => new
             {
                 team_name = r.GetValueOrDefault(cols.TeamName),
@@ -179,8 +172,6 @@ public static class NhlEndpoints
                 shots = r.GetValueOrDefault(cols.Shots),
                 hits = r.GetValueOrDefault("hits"),
                 gamertag = r.GetValueOrDefault(cols.GamerTag),
-                netLatency = Math.Min(Convert.ToDouble(r.GetValueOrDefault("lateavgnet") ?? 0), MaxLatencyCap),
-                teamLatency = Math.Min(Convert.ToDouble(r.GetValueOrDefault("ltean") ?? r.GetValueOrDefault("ltennet") ?? 0), MaxLatencyCap)
             }),
             status = Convert.ToBoolean(g.GetValueOrDefault("fnsh") ?? false) ? "Finished" : "In Progress"
         };
