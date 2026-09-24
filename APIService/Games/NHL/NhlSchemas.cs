@@ -36,7 +36,7 @@ public static class NhlSchemas
         {
             new NhlReportSource { Mode = NhlReportMode.Vs,  JsonKey = "VS",  Table = "reports" },
             new NhlReportSource { Mode = NhlReportMode.So,  JsonKey = "SO",  Table = "so_reports" },
-            new NhlReportSource { Mode = NhlReportMode.Otp, JsonKey = "OTP", Table = "otp_reportsl" },
+            new NhlReportSource { Mode = NhlReportMode.Otp, JsonKey = "OTP", Table = "otp_reports" },
         }
     };
 
